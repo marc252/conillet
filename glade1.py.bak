@@ -1,0 +1,108 @@
+#!/usr/bin/env python
+from gi.repository import Gtk
+import math
+import logging
+from datetime import datetime
+from preferences import Preferences
+
+class MyHandler(logging.Handler):
+    def __init__(self, widget):
+        logging.Handler.__init__(self)
+        self.widget = widget
+
+    def handle(self, rec):
+        #original = self.label.get_text()
+        buffer=self.widget.get_buffer()
+        end_text = buffer.get_end_iter()
+        data = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        buffer.insert(end_text,"\n"+data+"=>"+rec.msg)
+
+class MyLogger():
+    def __init__(self, widget):
+        self.logger = logging.getLogger("Example")
+        self.handler = MyHandler(widget)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        self.logger.addHandler(self.handler)
+        self.logger.addHandler(ch)
+
+    def warning(self, msg):
+        self.logger.warning(msg)
+
+
+class Buglump:
+    def __init__(self):
+        self.gladefile = "tutorial-1.glade" # store the file name
+        self.builder = Gtk.Builder() # create an instance of the gtk.Builder
+        #self.builder.add_from_file(self.gladefile) # add the xml file to the Builder
+        self.builder.add_objects_from_file(self.gladefile,
+                ["window1","aboutdialog1","statusbar1","status",
+                "log_result","entry1","entry2","result1","logwindow",
+                "image1","image2","image3","image4"])
+        self.builder.connect_signals(self)
+        self.window = self.builder.get_object("window1") # This gets the 'window1' object
+        self.aboutdialog = self.builder.get_object("aboutdialog1")
+        self.log_window = self.builder.get_object("logwindow")
+        self.statusbar = self.builder.get_object("statusbar1")
+        self.context_id = self.statusbar.get_context_id("status")
+        self.logger_label = self.builder.get_object("log_result")
+        self.logger = MyLogger(self.logger_label)
+        self.preferences = Preferences(self.builder,self.logger)
+        self.logger.warning("Inici aplicacio")
+        self.window.show() # this shows the 'window1' object
+        self.status_count=0
+
+    def on_logwindow_close_button_clicked(self,button,data=None):
+        self.log_window.hide()
+
+    def on_logwindow_delete_event(self,object,event):
+        self.log_window.hide()
+        return True
+
+    def on_view_log_activate(self,menuitem,data=None):
+        self.response = self.log_window.show()
+
+    def on_preferences_activate(self, menuitem,data=None):
+        self.response = self.preferences.preferences_window.show()
+
+    def on_gtk_about_activate(self, menuitem, data=None):
+        self.logger.warning("help about selected")
+        self.response = self.aboutdialog.run()
+        self.aboutdialog.hide()
+
+    def on_window1_destroy(self, object, data=None):
+        self.logger.warning( "quit with cancel")
+        Gtk.main_quit()
+
+    def on_gtk_quit_activate(self, menuitem, data=None):
+        print "quit from menu"
+        Gtk.main_quit()
+
+    def on_push_status_activate(self, menuitem, data=None):
+        self.status_count += 1
+        self.logger.warning("Ara status count val: %s" % self.status_count)
+        self.statusbar.push(self.context_id, "Message number %s" % str(self.status_count))
+
+    def on_pop_status_activate(self, menuitem, data=None):
+        self.status_count -= 1
+        self.statusbar.pop(self.context_id)
+
+    def on_clear_status_activate(self, menuitem, data=None):
+        while (self.status_count > 0):
+            self.statusbar.pop(self.context_id)
+            self.status_count -= 1
+
+    def on_sfm_button_clicked(self, button, data=None):
+        self.entry1 = self.builder.get_object("entry1")
+        self.entry2 = self.builder.get_object("entry2")
+        self.result1 = self.builder.get_object("result1")
+        self.sfm = float(self.entry1.get_text())
+        self.diameter = float(self.entry2.get_text())
+        self.rpm = str(int(self.sfm * ((12/math.pi)/self.diameter)))
+        print "calculate rpm clicked"
+        self.result1.set_text(self.rpm)
+
+if __name__ == "__main__":
+  main = Buglump() # create an instance of our class
+  Gtk.main() # run the darn thing
